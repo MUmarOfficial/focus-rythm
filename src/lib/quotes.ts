@@ -1,48 +1,55 @@
 export interface QuoteItem {
   id: string;
   text: string;
+  category?: string;
   subtext?: string;
 }
 
 export const WORK_QUOTES: QuoteItem[] = [
-  { id: 'w1', text: 'Small, repeated efforts cut through any complex problem.' },
-  { id: 'w2', text: 'One clean function at a time. Do not rush the architecture.' },
-  { id: 'w3', text: 'Focus is not about doing more; it is about protecting your attention.' },
-  { id: 'w4', text: 'Debugging teaches patience. True mastery is built in the difficult moments.' },
-  { id: 'w5', text: 'Silence the noise outside. Right now, this single problem is your world.' },
-  { id: 'w6', text: 'Depth creates clarity. Shallow distractions produce shallow results.' },
-  { id: 'w7', text: 'Stay with the resistance. That is where real understanding happens.' },
-  { id: 'w8', text: 'Code simply and think deeply. Elegance is what remains when excess is removed.' },
-  { id: 'w9', text: 'Progress is quiet. Consistency over weeks outruns sudden bursts of effort.' },
-  { id: 'w10', text: 'Trust the rhythm. A steady pace will take you further than urgent panic.' },
-  { id: 'w11', text: 'You do not need to finish everything today. Just move this block forward.' },
-  { id: 'w12', text: 'Clarity arrives through disciplined observation and continuous iteration.' },
-  { id: 'w13', text: 'Protect your cognitive energy. Treat your concentration as your highest craft.' },
-  { id: 'w14', text: 'Break the problem down until the next step feels completely obvious.' }
+  // Cognitive Protocols & Technique
+  { id: 'w1', category: 'FOCUS PROTOCOL', text: 'Define clear exit criteria before writing code. What does "done" look like for this round?' },
+  { id: 'w2', category: 'ATTENTION SHIELD', text: 'Single-tab discipline: Silence communication streams. Protect your focus as your highest craft.' },
+  { id: 'w3', category: 'FLOW STATE', text: 'The first 7 minutes generate friction. Push through resistance to reach effortless momentum.' },
+  { id: 'w4', category: 'DEBUGGING CUE', text: 'Rubber-duck clarity: If stuck, explain the exact state transitions out loud or write them down.' },
+  { id: 'w5', category: 'PROBLEM SOLVING', text: 'Sub-problem decomposition: Split the daunting task into 3 microscopic, trivial steps.' },
+  { id: 'w6', category: 'CRAFT', text: 'One clean function at a time. Elegance is what remains when excess complexity is stripped away.' },
+  { id: 'w7', category: 'DOPAMINE HYGIENE', text: 'Resist the urge to check status feeds or notification badges until the timer chime rings.' },
+  { id: 'w8', category: 'CODE DESIGN', text: 'State machine thinking: Model system transitions on paper before touching UI or rendering logic.' },
+  { id: 'w9', category: 'TEST-DRIVEN', text: 'Write the failing test or assertion first. Let automated feedback guide your implementation rhythm.' },
+  { id: 'w10', category: 'PERSISTENCE', text: 'Stay with the resistance. The hardest debugging moments are where genuine mastery is forged.' },
+  { id: 'w11', category: 'FLOW STATE', text: 'Silence the inner editor while drafting. Produce the working solution, then refactor cleanly.' },
+  { id: 'w12', category: 'MEMORY SHIELD', text: 'Keep a quick scratchpad open for stray thoughts rather than tab-switching away.' },
+  { id: 'w13', category: 'MINDSET', text: 'You do not need to finish everything today. Just move this block forward with deliberate care.' },
+  { id: 'w14', category: 'MOMENTUM', text: 'Small, repeated efforts cut through any complex problem. Consistency outruns sudden bursts.' },
+  { id: 'w15', category: 'CLARITY', text: 'Depth over speed. A robust 30-minute focus session beats 8 hours of fractured distraction.' },
+  { id: 'w16', category: 'FOCUS PROTOCOL', text: 'Edge-case containment: Implement the happy path first, then methodically guard boundary cases.' },
+  { id: 'w17', category: 'CADENCE', text: 'Trust the rhythm. A steady, sustainable pace will take you further than urgent panic.' },
+  { id: 'w18', category: 'CRAFT', text: 'Clarity arrives through disciplined observation, clean types, and continuous iteration.' }
 ];
 
 export const REST_PROMPTS: QuoteItem[] = [
-  { id: 'r1', text: 'Drink a glass of water slowly and step away from the keyboard.' },
-  { id: 'r2', text: 'Close your eyes for 30 seconds and let your optic nerve completely rest.' },
-  { id: 'r3', text: 'Roll your shoulders back, drop your chin gently, and release neck tension.' },
-  { id: 'r4', text: 'Look out a window or focus on a distant object for 20 seconds.' },
-  { id: 'r5', text: 'Take five slow, deep breaths: inhale for 4 seconds, exhale for 6.' },
-  { id: 'r6', text: 'Stand up, shake out your hands and wrists, and walk around your room.' },
-  { id: 'r7', text: 'Unclench your jaw, soften your forehead, and let your spine settle naturally.' },
-  { id: 'r8', text: 'Rest your palms in your lap. Notice the quiet rhythm of your breathing.' },
-  { id: 'r9', text: 'Stretch both arms above your head and gently lean side to side.' }
+  { id: 'r1', category: 'EYE RECOVERY', text: '20-20-20 Rule: Focus on an object 20 feet away for 20 seconds to relax ciliary eye muscles.' },
+  { id: 'r2', category: 'PHYSIOLOGY', text: 'Physiological Sigh: Two deep inhales through your nose, followed by a long, slow exhale through your mouth.' },
+  { id: 'r3', category: 'HYDRATION', text: 'Drink a glass of water slowly. Cognitive stamina drops measurably with mild dehydration.' },
+  { id: 'r4', category: 'TENSION RELEASE', text: 'Roll shoulders back, drop chin gently, unclench your jaw, and let your spine settle naturally.' },
+  { id: 'r5', category: 'MOBILITY', text: 'Stand up, reach both arms toward the ceiling, and gently stretch side to side.' },
+  { id: 'r6', category: 'OPTIC REST', text: 'Palming Technique: Cup warm palms gently over closed eyes in complete darkness for 30 seconds.' },
+  { id: 'r7', category: 'CIRCULATION', text: 'Stand up, shake out your hands and wrists, and take a quick walk away from your screen.' },
+  { id: 'r8', category: 'BREATHWORK', text: 'Cadence Breathing: Inhale for 4 seconds, hold for 4, exhale for 6. Let your pulse settle.' },
+  { id: 'r9', category: 'DIGITAL DETOX', text: 'Step away from the screen entirely. Avoid opening your phone during this interval.' },
+  { id: 'r10', category: 'HORIZON RESET', text: 'Look out a window toward the distant horizon. Natural light resets cognitive alertness.' },
+  { id: 'r11', category: 'ERGONOMICS', text: 'Interlace fingers, rotate wrists in circles, and gently stretch your forearms.' }
 ];
 
 export const REST_BENEFITS: QuoteItem[] = [
-  { id: 'b1', text: 'Rest is not lost time; it is when your brain synthesizes newly learned patterns.' },
-  { id: 'b2', text: 'Short mental breaks prevent decision fatigue and keep code quality elevated.' },
-  { id: 'b3', text: 'Allowing your attention to drift clears cognitive buffer and sparks creative solutions.' },
-  { id: 'b4', text: 'Recovery allows your nervous system to stay steady across multiple hours.' },
-  { id: 'b5', text: 'Taking deliberate breaks is a mark of professional stamina, not weakness.' },
-  { id: 'b6', text: 'A rested mind spots subtle logic bugs long before they reach production.' },
-  { id: 'b7', text: 'Memory consolidation requires downtime. Let your subconscious do its work.' },
-  { id: 'b8', text: 'Stepping back gives you fresh perspective when you re-enter the problem space.' },
-  { id: 'b9', text: 'Sustained focus is a muscle; recovery between sets is what builds capacity.' }
+  { id: 'b1', category: 'NEUROSCIENCE', text: 'Synaptic Consolidation: The brain synthesizes newly learned code patterns during offline downtime.' },
+  { id: 'b2', category: 'CREATIVITY', text: 'Default Mode Network: Breakthrough solutions predominantly trigger when active focus is disengaged.' },
+  { id: 'b3', category: 'ENERGY', text: 'Cognitive Buffer Reset: Rest restores prefrontal cortex glycogen, preventing decision fatigue.' },
+  { id: 'b4', category: 'VISION', text: 'Optic Relief: Stepping back from close monitors prevents digital eye strain and tension headaches.' },
+  { id: 'b5', category: 'STAMINA', text: 'Taking deliberate breaks is a hallmark of professional stamina, ensuring peak output all day.' },
+  { id: 'b6', category: 'CODE QUALITY', text: 'A rested mind spots subtle logic bugs long before they reach production.' },
+  { id: 'b7', category: 'NERVOUS SYSTEM', text: 'Deep exhales stimulate the vagus nerve, down-regulating cortisol and steadying heart rate.' },
+  { id: 'b8', category: 'PERSPECTIVE', text: 'Stepping back gives you fresh perspective and clarifies the next immediate step.' }
 ];
 
 export class QuoteSelector {
@@ -55,9 +62,8 @@ export class QuoteSelector {
 
   select(list: QuoteItem[]): QuoteItem {
     if (!list.length) {
-      return { id: 'fallback', text: 'Stay focused on the present moment.' };
+      return { id: 'fallback', category: 'FOCUS', text: 'Stay focused on the present moment.' };
     }
-    // Filter candidates not recently selected
     const candidates = list.filter((item) => !this.recentIds.includes(item.id));
     const pool = candidates.length > 0 ? candidates : list;
     const choice = pool[Math.floor(Math.random() * pool.length)];
@@ -70,6 +76,6 @@ export class QuoteSelector {
   }
 }
 
-export const workQuoteSelector = new QuoteSelector(5);
-export const restPromptSelector = new QuoteSelector(4);
+export const workQuoteSelector = new QuoteSelector(6);
+export const restPromptSelector = new QuoteSelector(5);
 export const restBenefitSelector = new QuoteSelector(4);

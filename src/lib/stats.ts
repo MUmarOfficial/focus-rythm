@@ -16,6 +16,7 @@ export interface DaySeriesItem {
   dayLabel: string;
   shortDate: string;
   minutes: number;
+  focusedSeconds: number;
   rounds: number;
   isToday: boolean;
 }
@@ -26,6 +27,17 @@ export interface SessionSegment {
   id: string;
   type: SegmentType;
   durationMs: number;
+}
+
+/**
+ * Converts accrued focused seconds into whole display minutes.
+ * Any positive focus time (< 60s) rounds up to at least 1 minute so short
+ * or partial sessions immediately appear in telemetry and charts.
+ */
+export function focusedSecondsToMinutes(focusedSeconds: number): number {
+  const safeSeconds = Math.max(0, Math.round(Number(focusedSeconds) || 0));
+  if (safeSeconds === 0) return 0;
+  return Math.max(1, Math.round(safeSeconds / 60));
 }
 
 /**
@@ -63,8 +75,13 @@ export function calculateStreaks(
   const yesterday = offsetDate(today, -1);
   const yesterdayKey = getLocalDateKey(yesterday);
 
-  const todayHasFocus = (dailyRecords[todayKey]?.focusedSeconds ?? 0) > 0;
-  const yesterdayHasFocus = (dailyRecords[yesterdayKey]?.focusedSeconds ?? 0) > 0;
+  const isDayActive = (key: string) => {
+    const rec = dailyRecords[key];
+    return Boolean(rec && ((rec.focusedSeconds ?? 0) > 0 || (rec.rounds ?? 0) > 0));
+  };
+
+  const todayHasFocus = isDayActive(todayKey);
+  const yesterdayHasFocus = isDayActive(yesterdayKey);
 
   let currentStreak = 0;
   let lastActiveDate: string | null = null;
@@ -73,7 +90,7 @@ export function calculateStreaks(
     lastActiveDate = todayKey;
     currentStreak = 1;
     let checkDate = offsetDate(today, -1);
-    while ((dailyRecords[getLocalDateKey(checkDate)]?.focusedSeconds ?? 0) > 0) {
+    while (isDayActive(getLocalDateKey(checkDate))) {
       currentStreak++;
       checkDate = offsetDate(checkDate, -1);
     }
@@ -81,7 +98,7 @@ export function calculateStreaks(
     lastActiveDate = yesterdayKey;
     currentStreak = 1;
     let checkDate = offsetDate(yesterday, -1);
-    while ((dailyRecords[getLocalDateKey(checkDate)]?.focusedSeconds ?? 0) > 0) {
+    while (isDayActive(getLocalDateKey(checkDate))) {
       currentStreak++;
       checkDate = offsetDate(checkDate, -1);
     }
@@ -89,7 +106,7 @@ export function calculateStreaks(
 
   // Calculate longest streak across all recorded days in history
   const allActiveDateKeys = Object.keys(dailyRecords)
-    .filter((key) => (dailyRecords[key]?.focusedSeconds ?? 0) > 0)
+    .filter((key) => isDayActive(key))
     .sort();
 
   if (allActiveDateKeys.length > 0 && !lastActiveDate) {
@@ -137,38 +154,11 @@ export function getLast7DaysSeries(
   dailyRecords: DailyRecordsMap,
   today: Date = new Date()
 ): DaySeriesItem[] {
-  const series: DaySeriesItem[] = [];
-  const todayKey = getLocalDateKey(today);
-
-  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-
-  for (let i = 6; i >= 0; i--) {
-    const targetDate = offsetDate(today, -i);
-    const dateKey = getLocalDateKey(targetDate);
-    const record = dailyRecords[dateKey];
-    const focusedSec = record?.focusedSeconds ?? 0;
-    const rounds = record?.rounds ?? 0;
-    const minutes = Math.round(focusedSec / 60);
-
-    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const day = String(targetDate.getDate()).padStart(2, '0');
-
-    series.push({
-      dateKey,
-      dayLabel: dayNames[targetDate.getDay()],
-      shortDate: `${month}/${day}`,
-      minutes,
-      rounds,
-      isToday: dateKey === todayKey
-    });
-  }
-
-  return series;
+  return getRecentDaysSeries(dailyRecords, 7, today);
 }
 
 /**
  * Generates a zero-filled daily series for the requested window, ending today.
- * Kept separate from the 7-day helper so existing callers retain their intent.
  */
 export function getRecentDaysSeries(
   dailyRecords: DailyRecordsMap,
@@ -184,15 +174,23 @@ export function getRecentDaysSeries(
     const targetDate = offsetDate(today, -i);
     const dateKey = getLocalDateKey(targetDate);
     const record = dailyRecords[dateKey];
+    const focusedSec = Math.max(0, Math.round(record?.focusedSeconds ?? 0));
+    const rounds = Math.max(0, Math.round(record?.rounds ?? 0));
+    const minutes = focusedSecondsToMinutes(focusedSec);
+
     const month = String(targetDate.getMonth() + 1).padStart(2, '0');
     const day = String(targetDate.getDate()).padStart(2, '0');
 
     series.push({
       dateKey,
-      dayLabel: safeDays > 14 ? `${targetDate.getMonth() + 1}/${targetDate.getDate()}` : dayNames[targetDate.getDay()],
+      dayLabel:
+        safeDays > 14
+          ? `${targetDate.getMonth() + 1}/${targetDate.getDate()}`
+          : dayNames[targetDate.getDay()],
       shortDate: `${month}/${day}`,
-      minutes: Math.round((record?.focusedSeconds ?? 0) / 60),
-      rounds: record?.rounds ?? 0,
+      minutes,
+      focusedSeconds: focusedSec,
+      rounds,
       isToday: dateKey === todayKey
     });
   }

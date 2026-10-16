@@ -4,6 +4,8 @@ import {
   offsetDate,
   calculateStreaks,
   getLast7DaysSeries,
+  getRecentDaysSeries,
+  focusedSecondsToMinutes,
   computeSegmentPlan,
   addFiveMinutesToBreak
 } from './stats';
@@ -12,6 +14,14 @@ describe('stats logic & pure functions', () => {
   it('correctly formats local date key YYYY-MM-DD', () => {
     const testDate = new Date(2026, 9, 16); // Oct 16, 2026
     expect(getLocalDateKey(testDate)).toBe('2026-10-16');
+  });
+
+  it('converts sub-minute positive focus seconds to at least 1 minute', () => {
+    expect(focusedSecondsToMinutes(0)).toBe(0);
+    expect(focusedSecondsToMinutes(12)).toBe(1);
+    expect(focusedSecondsToMinutes(59)).toBe(1);
+    expect(focusedSecondsToMinutes(120)).toBe(2);
+    expect(focusedSecondsToMinutes(3000)).toBe(50);
   });
 
   it('keeps streak alive when only yesterday has data (today has no focus yet)', () => {
@@ -57,20 +67,26 @@ describe('stats logic & pure functions', () => {
     expect(result.lastActiveDate).toBe(getLocalDateKey(today));
   });
 
-  it('generates 7-day series with zero-fill for days without activity', () => {
+  it('generates 7-day and 30-day series with zero-fill for days without activity', () => {
     const today = new Date(2026, 9, 16);
     const twoDaysAgo = offsetDate(today, -2);
 
     const dailyRecords = {
-      [getLocalDateKey(twoDaysAgo)]: { focusedSeconds: 3000, rounds: 2 } // 50 mins
+      [getLocalDateKey(twoDaysAgo)]: { focusedSeconds: 3000, rounds: 2 }, // 50 mins
+      [getLocalDateKey(today)]: { focusedSeconds: 20, rounds: 1 } // short 20s session -> 1m
     };
 
     const series = getLast7DaysSeries(dailyRecords, today);
     expect(series).toHaveLength(7);
     expect(series[6].isToday).toBe(true);
-    expect(series[6].minutes).toBe(0); // Today is 0
+    expect(series[6].minutes).toBe(1);
     expect(series[4].minutes).toBe(50); // 2 days ago is 50
     expect(series[0].minutes).toBe(0); // 6 days ago is 0
+
+    const monthSeries = getRecentDaysSeries(dailyRecords, 30, today);
+    expect(monthSeries).toHaveLength(30);
+    expect(monthSeries[29].isToday).toBe(true);
+    expect(monthSeries[29].minutes).toBe(1);
   });
 
   it('computes segment plan when session is shorter than one work interval', () => {

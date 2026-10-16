@@ -5,6 +5,7 @@ import {
   calculateStreaks,
   getLast7DaysSeries,
   getRecentDaysSeries,
+  focusedSecondsToMinutes,
   DaySeriesItem
 } from '../lib/stats';
 import { FxLevel, SessionSettings, PRESET_CONFIGS } from '../types';
@@ -21,15 +22,28 @@ const DEFAULT_SETTINGS: SessionSettings = {
   soundCues: true
 };
 
+function sanitizeDailyRecords(raw: unknown): DailyRecordsMap {
+  if (!raw || typeof raw !== 'object') return {};
+  const map: DailyRecordsMap = {};
+  for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (val && typeof val === 'object') {
+      const entry = val as { focusedSeconds?: unknown; rounds?: unknown };
+      const focusedSeconds = Math.max(0, Math.round(Number(entry.focusedSeconds) || 0));
+      const rounds = Math.max(0, Math.round(Number(entry.rounds) || 0));
+      if (focusedSeconds > 0 || rounds > 0) {
+        map[key] = { focusedSeconds, rounds };
+      }
+    }
+  }
+  return map;
+}
+
 export function useStats() {
   const [dailyRecords, setDailyRecords] = useState<DailyRecordsMap>(() => {
     try {
       const raw = localStorage.getItem(STATS_STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          return parsed as DailyRecordsMap;
-        }
+        return sanitizeDailyRecords(JSON.parse(raw));
       }
     } catch (err) {
       console.warn('Failed to parse stats from localStorage:', err);
@@ -67,7 +81,7 @@ export function useStats() {
     } catch (err) {
       console.warn('Failed to parse fx level from localStorage:', err);
     }
-    return 'LOW'; // default to LOW as requested in guardrails
+    return 'LOW';
   });
 
   // Save daily records to localStorage safely
@@ -100,16 +114,18 @@ export function useStats() {
   // Record focused time and rounds for a session
   const recordSession = useCallback(
     (accruedFocusedSeconds: number, completedRounds: number) => {
-      if (accruedFocusedSeconds <= 0 && completedRounds <= 0) return;
+      const safeSec = Math.max(0, Math.round(Number(accruedFocusedSeconds) || 0));
+      const safeRounds = Math.max(0, Math.round(Number(completedRounds) || 0));
+      if (safeSec <= 0 && safeRounds <= 0) return;
 
       setDailyRecords((prev) => {
         const todayKey = getLocalDateKey();
         const existing = prev[todayKey] || { focusedSeconds: 0, rounds: 0 };
-        const updated = {
+        const updated: DailyRecordsMap = {
           ...prev,
           [todayKey]: {
-            focusedSeconds: existing.focusedSeconds + Math.max(0, Math.round(accruedFocusedSeconds)),
-            rounds: existing.rounds + Math.max(0, completedRounds)
+            focusedSeconds: existing.focusedSeconds + safeSec,
+            rounds: existing.rounds + safeRounds
           }
         };
         persistRecords(updated);
@@ -119,10 +135,23 @@ export function useStats() {
     [persistRecords]
   );
 
+  const addTestSession = useCallback(
+    (minutes: number = 25, rounds: number = 1) => {
+      recordSession(minutes * 60, rounds);
+    },
+    [recordSession]
+  );
+
+  const clearStats = useCallback(() => {
+    setDailyRecords({});
+    persistRecords({});
+  }, [persistRecords]);
+
   // Derived statistics (self-correcting from daily map)
   const todayKey = getLocalDateKey();
   const todayRecord = dailyRecords[todayKey] || { focusedSeconds: 0, rounds: 0 };
-  const todayFocusedMinutes = Math.round(todayRecord.focusedSeconds / 60);
+  const todayFocusedSeconds = todayRecord.focusedSeconds;
+  const todayFocusedMinutes = focusedSecondsToMinutes(todayRecord.focusedSeconds);
   const todayRounds = todayRecord.rounds;
 
   const streaks = useMemo(() => {
@@ -138,7 +167,9 @@ export function useStats() {
   }, [dailyRecords]);
 
   const hasAnyData = useMemo(() => {
-    return Object.values(dailyRecords).some((record) => record.focusedSeconds > 0 || record.rounds > 0);
+    return Object.values(dailyRecords).some(
+      (record) => (record?.focusedSeconds ?? 0) > 0 || (record?.rounds ?? 0) > 0
+    );
   }, [dailyRecords]);
 
   return {
@@ -148,6 +179,9 @@ export function useStats() {
     fxLevel,
     setFxLevel,
     recordSession,
+    addTestSession,
+    clearStats,
+    todayFocusedSeconds,
     todayFocusedMinutes,
     todayRounds,
     currentStreak: streaks.currentStreak,

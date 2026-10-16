@@ -9,7 +9,9 @@ import {
   Clock,
   Zap,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { TimerPhase, FxLevel } from '../types';
 import { CountdownVaporDigits } from './ui/countdown-vapor-digits';
@@ -38,6 +40,9 @@ export interface TimerCardProps {
   onSkipBreak: () => void;
   onMinimize: () => void;
   onEndSession: (saveProgress?: boolean) => void;
+  onCycleWorkQuote?: () => void;
+  onCycleRestPrompt?: () => void;
+  onCycleRestBenefit?: () => void;
 }
 
 export const TimerCard: React.FC<TimerCardProps> = ({
@@ -57,7 +62,10 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   onAddFiveMinutes,
   onSkipBreak,
   onMinimize,
-  onEndSession
+  onEndSession,
+  onCycleWorkQuote,
+  onCycleRestPrompt,
+  onCycleRestBenefit
 }) => {
   const [showConfirmEnd, setShowConfirmEnd] = useState<boolean>(false);
 
@@ -73,7 +81,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   const formattedSessionTime = `${totalSessionMin}m ${String(totalSessionSecRem).padStart(2, '0')}s`;
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:py-8 space-y-6">
+    <div className="w-full lg:w-[80%] max-w-5xl mx-auto flex-1 min-h-0 h-full flex flex-col justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 overflow-hidden">
       {/* Screen Reader Polite Live Region for phase changes */}
       <div className="sr-only" aria-live="polite">
         {isWork
@@ -125,7 +133,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
       )}
 
       {/* HUD Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4 select-none">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 select-none">
         <div className="flex items-center space-x-3">
           <NeonBadge variant={isWork ? 'accent' : 'cyan'}>
             {isWork ? 'PHASE: WORK / FOCUS' : 'PHASE: RECHARGE BREAK'}
@@ -159,7 +167,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
       </div>
 
       {/* Main Countdown Centerpiece */}
-      <div className="flex flex-col items-center justify-center py-6 sm:py-10 bg-[#12121a]/60 border border-border cyber-chamfer relative overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-4 px-4 bg-[#12121a]/60 border border-border cyber-chamfer relative overflow-hidden">
         {/* Subtle background glow */}
         <div
           className="absolute inset-0 pointer-events-none opacity-10"
@@ -169,7 +177,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
         />
 
         {isBreak ? (
-          <div className="text-center mb-2 z-10">
+          <div className="text-center mb-1 z-10">
             <GlitchText
               text="YOUR BREAK HAS STARTED"
               as="h2"
@@ -197,114 +205,190 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           fxLevel={isBreak ? 'OFF' : fxLevel}
         />
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center justify-center gap-4 mt-6 z-10">
-          {isWork ? (
-            <>
-              {isPaused ? (
-                <CyberButton
-                  variant="default"
-                  onClick={onTogglePause}
-                  className="flex items-center space-x-2"
-                >
-                  <Play className="h-4 w-4 fill-current" />
-                  <span>RESUME FOCUS</span>
-                </CyberButton>
-              ) : (
-                <CyberButton
-                  variant="secondary"
-                  onClick={onTogglePause}
-                  className="flex items-center space-x-2"
-                >
-                  <Pause className="h-4 w-4 fill-current" />
-                  <span>PAUSE</span>
-                </CyberButton>
-              )}
-
-              <CyberButton
-                variant="outline"
-                onClick={() => setShowConfirmEnd(true)}
-                className="flex items-center space-x-2 hover:border-destructive hover:text-destructive"
-              >
-                <XSquare className="h-4 w-4" />
-                <span>END SESSION</span>
-              </CyberButton>
-            </>
-          ) : (
-            <>
+        {/* Action Controls — uniform button widths across both Work and Break phases */}
+        {isWork ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md mt-4 z-10">
+            {isPaused ? (
               <CyberButton
                 variant="default"
-                onClick={onAddFiveMinutes}
-                className="border-accent-tertiary text-accent-tertiary hover:bg-accent-tertiary hover:text-background hover:shadow-[0_0_15px_rgba(0,212,255,0.6)] focus-visible:ring-accent-tertiary flex items-center space-x-2"
+                fullWidth
+                onClick={onTogglePause}
+                className="flex items-center justify-center space-x-2"
               >
-                <PlusCircle className="h-4 w-4" />
-                <span>ADD 5 MINUTES</span>
+                <Play className="h-4 w-4 fill-current" />
+                <span>RESUME FOCUS</span>
               </CyberButton>
-
+            ) : (
               <CyberButton
-                variant="ghost"
-                onClick={onMinimize}
-                className="flex items-center space-x-2 text-accent-tertiary"
+                variant="secondary"
+                fullWidth
+                onClick={onTogglePause}
+                className="flex items-center justify-center space-x-2"
               >
-                <Minimize2 className="h-4 w-4" />
-                <span>MINIMIZE TO DOCK</span>
+                <Pause className="h-4 w-4 fill-current" />
+                <span>PAUSE</span>
               </CyberButton>
+            )}
 
+            <CyberButton
+              variant="outline"
+              fullWidth
+              onClick={() => setShowConfirmEnd(true)}
+              className="flex items-center justify-center space-x-2"
+            >
+              <XSquare className="h-4 w-4" />
+              <span>END SESSION</span>
+            </CyberButton>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl mt-4 z-10">
+            <CyberButton
+              variant="outline"
+              fullWidth
+              onClick={onAddFiveMinutes}
+              className="border-accent-tertiary/60 text-accent-tertiary hover:border-[#00ff88] hover:text-[#00ff88] hover:bg-[#00ff88]/10 hover:shadow-[0_0_12px_rgba(0,255,136,0.3)] flex items-center justify-center space-x-2"
+            >
+              <PlusCircle className="h-4 w-4 shrink-0" />
+              <span>ADD 5 MINUTES</span>
+            </CyberButton>
+
+            <CyberButton
+              variant="outline"
+              fullWidth
+              onClick={onMinimize}
+              className="border-accent-tertiary/60 text-accent-tertiary hover:border-[#00ff88] hover:text-[#00ff88] hover:bg-[#00ff88]/10 hover:shadow-[0_0_12px_rgba(0,255,136,0.3)] flex items-center justify-center space-x-2"
+            >
+              <Minimize2 className="h-4 w-4 shrink-0" />
+              <span>MINIMIZE TO DOCK</span>
+            </CyberButton>
+
+            <CyberButton
+              variant="outline"
+              fullWidth
+              onClick={onSkipBreak}
+              className="border-accent-tertiary/60 text-accent-tertiary hover:border-[#00ff88] hover:text-[#00ff88] hover:bg-[#00ff88]/10 hover:shadow-[0_0_12px_rgba(0,255,136,0.3)] flex items-center justify-center space-x-2"
+            >
+              <FastForward className="h-4 w-4 shrink-0" />
+              <span>START WORK NOW</span>
+            </CyberButton>
+
+            {/* END SESSION placed directly beneath MINIMIZE TO DOCK (middle column) with identical width */}
+            <div className="sm:col-start-2">
               <CyberButton
-                variant="glitch"
-                onClick={onSkipBreak}
-                className="flex items-center space-x-2"
+                variant="outline"
+                fullWidth
+                onClick={() => setShowConfirmEnd(true)}
+                className="flex items-center justify-center space-x-2 hover:bg-[#00ff88]/10"
               >
-                <FastForward className="h-4 w-4" />
-                <span>START WORK NOW</span>
+                <XSquare className="h-4 w-4 shrink-0" />
+                <span>END SESSION</span>
               </CyberButton>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Quote / Rest Prompt Display Card */}
-      {isWork ? (
-        <CyberCard variant="terminal" title="focus_buffer.txt">
-          <div className="py-1">
-            <TerminalLine
-              prompt=">"
-              text={currentWorkQuote.text}
-              typing
-              typingSpeed={20}
-              showCursor
-              cursorColor="accent"
-              fxLevel={fxLevel}
-              className="text-sm sm:text-base text-foreground"
-            />
-          </div>
-        </CyberCard>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <CyberCard variant="terminal" title="rest_action.sh">
-            <div className="space-y-1.5 py-1">
-              <span className="font-mono text-xs text-accent-tertiary font-bold uppercase tracking-wider block">
-                &gt; RECOMMENDED_ACTION:
+      {/* Quote / Rest Prompt Display Card — all boxes use TerminalLine typing effect */}
+      <div className="shrink-0">
+        {isWork ? (
+          <CyberCard variant="terminal" title="focus_buffer.txt">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2 mb-2">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-[#00ff88] flex items-center gap-1.5 font-bold">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>// {currentWorkQuote.category || 'FOCUS PROTOCOL'}</span>
               </span>
-              <p className="font-mono text-sm text-foreground leading-relaxed">
-                {currentRestPrompt.text}
-              </p>
+              {onCycleWorkQuote && (
+                <button
+                  type="button"
+                  onClick={onCycleWorkQuote}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] text-muted-foreground hover:text-[#00ff88] border border-border hover:border-[#00ff88]/60 cyber-chamfer-sm transition-colors cursor-pointer bg-[#12121a]/80"
+                  title="Get another focus strategy suggestion"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>NEXT SUGGESTION</span>
+                </button>
+              )}
+            </div>
+            <div className="py-0.5">
+              <TerminalLine
+                key={currentWorkQuote.id}
+                prompt=">"
+                text={currentWorkQuote.text}
+                typing
+                typingSpeed={20}
+                showCursor
+                cursorColor="accent"
+                fxLevel={fxLevel}
+                className="text-xs sm:text-sm text-foreground font-medium"
+              />
             </div>
           </CyberCard>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <CyberCard variant="terminal" title="rest_action.sh">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-1.5 mb-1.5">
+                <span className="font-mono text-xs text-accent-tertiary font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>// {currentRestPrompt.category || 'RECOMMENDED ACTION'}</span>
+                </span>
+                {onCycleRestPrompt && (
+                  <button
+                    type="button"
+                    onClick={onCycleRestPrompt}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-accent-tertiary border border-border hover:border-accent-tertiary/60 cyber-chamfer-sm transition-colors cursor-pointer bg-[#12121a]/80"
+                    title="Next rest suggestion"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    <span>NEXT ACTION</span>
+                  </button>
+                )}
+              </div>
+              <TerminalLine
+                key={currentRestPrompt.id}
+                prompt=">"
+                text={currentRestPrompt.text}
+                typing
+                typingSpeed={20}
+                showCursor
+                cursorColor="cyan"
+                fxLevel={fxLevel}
+                className="text-xs sm:text-sm text-foreground font-medium"
+              />
+            </CyberCard>
 
-          <CyberCard variant="holographic" cornerAccent="cyan">
-            <div className="space-y-1.5">
-              <span className="font-mono text-xs text-accent-tertiary font-bold uppercase tracking-wider flex items-center space-x-1.5">
-                <CheckCircle className="h-3.5 w-3.5" />
-                <span>RESTORATION_TELEMETRY:</span>
-              </span>
-              <p className="font-mono text-xs text-muted-foreground leading-relaxed">
-                {currentRestBenefit.text}
-              </p>
-            </div>
-          </CyberCard>
-        </div>
-      )}
+            <CyberCard variant="holographic" cornerAccent="cyan">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#00d4ff]/20 pb-1.5 mb-1.5">
+                <span className="font-mono text-xs text-accent-tertiary font-bold uppercase tracking-wider flex items-center space-x-1.5">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  <span>RESTORATION_TELEMETRY:</span>
+                </span>
+                {onCycleRestBenefit && (
+                  <button
+                    type="button"
+                    onClick={onCycleRestBenefit}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-accent-tertiary border border-border hover:border-accent-tertiary/60 cyber-chamfer-sm transition-colors cursor-pointer bg-[#12121a]/80"
+                    title="Next science rationale"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    <span>NEXT</span>
+                  </button>
+                )}
+              </div>
+              <TerminalLine
+                key={currentRestBenefit.id}
+                prompt=">"
+                text={currentRestBenefit.text}
+                typing
+                typingSpeed={20}
+                showCursor
+                cursorColor="cyan"
+                fxLevel={fxLevel}
+                className="text-xs text-muted-foreground"
+              />
+            </CyberCard>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

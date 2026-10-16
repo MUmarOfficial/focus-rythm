@@ -32,14 +32,17 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
   const [completedRounds, setCompletedRounds] = useState<number>(0);
   const [accruedWorkSeconds, setAccruedWorkSeconds] = useState<number>(0);
 
-  // Segments timestamp tracking for accurate partial accounting
+  // Segment-level tracking so live incremental saves never double-count
   const segmentStartedAtRef = useRef<number>(0);
   const workDurationAccruedInCurrentSegmentRef = useRef<number>(0);
+  const roundCreditedInCurrentSegmentRef = useRef<boolean>(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const soundCuesEnabledRef = useRef(true);
 
-  // A short, distinct notification tone for every work/rest start. Creating the
-  // context from Start keeps it compliant with browser audio-gesture policies.
+  const onSessionFinishRef = useRef(onSessionFinish);
+  onSessionFinishRef.current = onSessionFinish;
+
+  // A short, distinct notification tone for every work/rest start.
   const playTransitionBeep = useCallback((nextType: 'work' | 'break') => {
     if (!soundCuesEnabledRef.current) return;
     try {
@@ -66,12 +69,11 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
         oscillator.stop(startAt + 0.13);
       });
     } catch (error) {
-      // Sound is an enhancement; timers must still operate when audio is unavailable.
       console.warn('Could not play transition beep:', error);
     }
   }, []);
 
-  // Quotes and rest messages selected ONLY at phase transitions
+  // Quotes and rest messages selected at phase transitions or cycled on demand
   const [currentWorkQuote, setCurrentWorkQuote] = useState<QuoteItem>(() =>
     workQuoteSelector.select(WORK_QUOTES)
   );
@@ -82,67 +84,126 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
     restBenefitSelector.select(REST_BENEFITS)
   );
 
+  // Manually cycle / request another suggestion
+  const cycleWorkQuote = useCallback(() => {
+    setCurrentWorkQuote(workQuoteSelector.select(WORK_QUOTES));
+  }, []);
+
+  const cycleRestPrompt = useCallback(() => {
+    setCurrentRestPrompt(restPromptSelector.select(REST_PROMPTS));
+  }, []);
+
+  const cycleRestBenefit = useCallback(() => {
+    setCurrentRestBenefit(restBenefitSelector.select(REST_BENEFITS));
+  }, []);
+
   // For UI ticker re-render
   const [, setTick] = useState<number>(0);
-
-  const onSessionFinishRef = useRef(onSessionFinish);
-  onSessionFinishRef.current = onSessionFinish;
 
   // Active segment
   const currentSegment = segments[currentSegmentIndex] as SessionSegment | undefined;
 
+  // Flush any newly elapsed work seconds (and optionally credit the round) to stats
+  const flushWorkProgress = useCallback(
+    (
+      segment: SessionSegment | undefined,
+      remainingMs: number,
+      creditRoundIfWorked: boolean
+    ): { deltaSec: number; roundDelta: number } => {
+      if (!segment || segment.type !== 'work') {
+        return { deltaSec: 0, roundDelta: 0 };
+      }
+
+      const segmentTotalSec = Math.max(1, Math.round(segment.durationMs / 1000));
+      const elapsedMs = Math.max(0, segment.durationMs - Math.max(0, remainingMs));
+      let elapsedSec = Math.min(segmentTotalSec, Math.floor(elapsedMs / 1000));
+
+      if (creditRoundIfWorked && elapsedMs >= 250 && elapsedSec === 0) {
+        elapsedSec = 1;
+      }
+
+      const deltaSec = Math.max(0, elapsedSec - workDurationAccruedInCurrentSegmentRef.current);
+      workDurationAccruedInCurrentSegmentRef.current += deltaSec;
+
+      const hasWorkedInSegment = workDurationAccruedInCurrentSegmentRef.current > 0;
+      const roundDelta =
+        creditRoundIfWorked && hasWorkedInSegment && !roundCreditedInCurrentSegmentRef.current
+          ? 1
+          : 0;
+
+      if (roundDelta > 0) {
+        roundCreditedInCurrentSegmentRef.current = true;
+      }
+
+      if (deltaSec > 0) {
+        setAccruedWorkSeconds((prev) => prev + deltaSec);
+      }
+      if (roundDelta > 0) {
+        setCompletedRounds((prev) => prev + roundDelta);
+      }
+
+      if ((deltaSec > 0 || roundDelta > 0) && onSessionFinishRef.current) {
+        onSessionFinishRef.current(deltaSec, roundDelta);
+      }
+
+      return { deltaSec, roundDelta };
+    },
+    []
+  );
+
   // Start a new session
-  const startSession = useCallback((settings: SessionSettings) => {
-    const plan = computeSegmentPlan(
-      settings.totalMinutes,
-      settings.workMinutes,
-      settings.breakMinutes
-    );
+  const startSession = useCallback(
+    (settings: SessionSettings) => {
+      const plan = computeSegmentPlan(
+        settings.totalMinutes,
+        settings.workMinutes,
+        settings.breakMinutes
+      );
 
-    if (plan.length === 0) return;
-    soundCuesEnabledRef.current = settings.soundCues;
+      if (plan.length === 0) return;
+      soundCuesEnabledRef.current = settings.soundCues;
 
-    setSegments(plan);
-    setCurrentSegmentIndex(0);
-    setCompletedRounds(0);
-    setAccruedWorkSeconds(0);
-    workDurationAccruedInCurrentSegmentRef.current = 0;
-    segmentStartedAtRef.current = Date.now();
+      setSegments(plan);
+      setCurrentSegmentIndex(0);
+      setCompletedRounds(0);
+      setAccruedWorkSeconds(0);
+      workDurationAccruedInCurrentSegmentRef.current = 0;
+      roundCreditedInCurrentSegmentRef.current = false;
+      segmentStartedAtRef.current = Date.now();
 
-    const firstSegment = plan[0];
-    const targetEnd = Date.now() + firstSegment.durationMs;
-    setEndsAt(targetEnd);
-    setPausedRemainingMs(firstSegment.durationMs);
-    setIsPaused(false);
+      const firstSegment = plan[0];
+      const targetEnd = Date.now() + firstSegment.durationMs;
+      setEndsAt(targetEnd);
+      setPausedRemainingMs(firstSegment.durationMs);
+      setIsPaused(false);
 
-    // Pick initial work quote
-    setCurrentWorkQuote(workQuoteSelector.select(WORK_QUOTES));
-    setPhase('work');
-    playTransitionBeep('work');
-  }, [playTransitionBeep]);
+      setCurrentWorkQuote(workQuoteSelector.select(WORK_QUOTES));
+      setPhase('work');
+      playTransitionBeep('work');
+    },
+    [playTransitionBeep]
+  );
 
   // Pause / Resume (applicable during work)
   const togglePause = useCallback(() => {
     if (phase !== 'work') return;
 
     if (!isPaused) {
-      // Pausing
       const remaining = Math.max(0, endsAt - Date.now());
+      flushWorkProgress(currentSegment, remaining, false);
       setPausedRemainingMs(remaining);
       setIsPaused(true);
     } else {
-      // Resuming
       const newEndsAt = Date.now() + pausedRemainingMs;
       setEndsAt(newEndsAt);
       setIsPaused(false);
     }
-  }, [phase, isPaused, endsAt, pausedRemainingMs]);
+  }, [phase, isPaused, endsAt, pausedRemainingMs, currentSegment, flushWorkProgress]);
 
   // Transition to next segment
   const advanceToSegment = useCallback(
     (nextIndex: number, currentSegments: SessionSegment[]) => {
       if (nextIndex >= currentSegments.length) {
-        // Plan exhausted: exit fullscreen, notify, go to complete phase
         desktop.setFullscreen(false);
         desktop.showNotification(
           'Focus Session Complete',
@@ -156,6 +217,7 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
       setCurrentSegmentIndex(nextIndex);
       segmentStartedAtRef.current = Date.now();
       workDurationAccruedInCurrentSegmentRef.current = 0;
+      roundCreditedInCurrentSegmentRef.current = false;
 
       const newEndsAt = Date.now() + nextSegment.durationMs;
       setEndsAt(newEndsAt);
@@ -168,9 +230,11 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
         setPhase('work');
         playTransitionBeep('work');
       } else {
-        // Break phase: notify, enter fullscreen, pick rest prompt & benefit
         desktop.setFullscreen(true);
-        desktop.showNotification('Time for a break.', 'Step away from the screen, stretch, and rest your eyes.');
+        desktop.showNotification(
+          'Time for a break.',
+          'Step away from the screen, stretch, and rest your eyes.'
+        );
         setCurrentRestPrompt(restPromptSelector.select(REST_PROMPTS));
         setCurrentRestBenefit(restBenefitSelector.select(REST_BENEFITS));
         setPhase('break');
@@ -213,30 +277,32 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
     (saveProgress = true) => {
       desktop.setFullscreen(false);
 
-      let finalAccruedSec = accruedWorkSeconds;
-      let partialWorkSeconds = 0;
+      let totalWorkedSec = accruedWorkSeconds;
+      let totalRounds = completedRounds;
 
-      // Credit partial work if currently in work segment
-      if (phase === 'work' && currentSegment && currentSegment.type === 'work') {
+      if (saveProgress && phase === 'work' && currentSegment?.type === 'work') {
         const remainingMs = isPaused ? pausedRemainingMs : Math.max(0, endsAt - Date.now());
-        const partialElapsedMs = Math.max(0, currentSegment.durationMs - remainingMs);
-        partialWorkSeconds = Math.round(partialElapsedMs / 1000);
-        finalAccruedSec += partialWorkSeconds;
+        const { deltaSec, roundDelta } = flushWorkProgress(currentSegment, remainingMs, true);
+        totalWorkedSec += deltaSec;
+        totalRounds += roundDelta;
       }
 
-      if (saveProgress && (finalAccruedSec > 0 || completedRounds > 0)) {
-        // Completed rounds are saved at the moment they finish. Save only the
-        // unsaved partial interval here so ending a session cannot duplicate data.
-        if (onSessionFinishRef.current) {
-          onSessionFinishRef.current(partialWorkSeconds, 0);
-        }
-        setAccruedWorkSeconds(finalAccruedSec);
+      if (saveProgress && (totalWorkedSec > 0 || totalRounds > 0)) {
         setPhase('complete');
       } else {
         setPhase('idle');
       }
     },
-    [phase, currentSegment, isPaused, pausedRemainingMs, endsAt, accruedWorkSeconds, completedRounds]
+    [
+      phase,
+      currentSegment,
+      isPaused,
+      pausedRemainingMs,
+      endsAt,
+      accruedWorkSeconds,
+      completedRounds,
+      flushWorkProgress
+    ]
   );
 
   // Reset back to setup screen
@@ -250,6 +316,8 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
     setPausedRemainingMs(0);
     setCompletedRounds(0);
     setAccruedWorkSeconds(0);
+    workDurationAccruedInCurrentSegmentRef.current = 0;
+    roundCreditedInCurrentSegmentRef.current = false;
   }, []);
 
   // State machine tick and segment transition handler
@@ -264,31 +332,17 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
       const now = Date.now();
       const remainingMs = endsAt - now;
 
-      // Re-render tick
       setTick(now);
 
-      if (remainingMs <= 0) {
-        // Current segment ended naturally
-        if (phase === 'work') {
-          // Work segment finished naturally: count completed round and accrue full segment duration
-          const roundInc = 1;
-          const segmentWorkSec = currentSegment ? Math.round(currentSegment.durationMs / 1000) : 0;
-          const updatedWorkSec = accruedWorkSeconds + segmentWorkSec;
-          const updatedRounds = completedRounds + roundInc;
-
-          setCompletedRounds(updatedRounds);
-          setAccruedWorkSeconds(updatedWorkSec);
-          // Persist each finished focus round immediately. This makes stats
-          // available even if the overall multi-round session is still running.
-          if (onSessionFinishRef.current && segmentWorkSec > 0) {
-            onSessionFinishRef.current(segmentWorkSec, roundInc);
-          }
-
-          advanceToSegment(currentSegmentIndex + 1, segments);
-        } else if (phase === 'break') {
-          // Break segment finished naturally: advance to next work segment
+      if (phase === 'work' && currentSegment?.type === 'work') {
+        if (remainingMs > 0) {
+          flushWorkProgress(currentSegment, remainingMs, false);
+        } else {
+          flushWorkProgress(currentSegment, 0, true);
           advanceToSegment(currentSegmentIndex + 1, segments);
         }
+      } else if (phase === 'break' && remainingMs <= 0) {
+        advanceToSegment(currentSegmentIndex + 1, segments);
       }
     }, 500);
 
@@ -300,8 +354,7 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
     currentSegment,
     currentSegmentIndex,
     segments,
-    completedRounds,
-    accruedWorkSeconds,
+    flushWorkProgress,
     advanceToSegment
   ]);
 
@@ -330,6 +383,9 @@ export function usePomodoro({ onSessionFinish }: UsePomodoroOptions = {}) {
     currentWorkQuote,
     currentRestPrompt,
     currentRestBenefit,
+    cycleWorkQuote,
+    cycleRestPrompt,
+    cycleRestBenefit,
     startSession,
     togglePause,
     addFiveMinutes,

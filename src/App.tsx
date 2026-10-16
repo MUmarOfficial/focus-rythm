@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useStats } from './hooks/use-stats';
 import { usePomodoro } from './hooks/use-pomodoro';
+import { focusedSecondsToMinutes } from './lib/stats';
 import { SetupPanel } from './components/SetupPanel';
 import { TimerCard } from './components/TimerCard';
 import { CompletionScreen } from './components/CompletionScreen';
@@ -15,6 +16,7 @@ export const App: React.FC = () => {
     fxLevel,
     setFxLevel,
     recordSession,
+    clearStats,
     todayFocusedMinutes,
     todayRounds,
     currentStreak,
@@ -36,7 +38,7 @@ export const App: React.FC = () => {
   });
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground cyber-grid cyber-noise overflow-x-hidden flex flex-col justify-between selection:bg-[#00ff88]/30 selection:text-[#00ff88]">
+    <div className="relative h-screen max-h-screen bg-background text-foreground cyber-grid cyber-noise overflow-hidden flex flex-col selection:bg-[#00ff88]/30 selection:text-[#00ff88]">
       {/* Scanline overlay according to FX Level */}
       <ScanlineOverlay fxLevel={fxLevel} />
 
@@ -81,7 +83,7 @@ export const App: React.FC = () => {
       </svg>
 
       {/* Thin Screen Router */}
-      <main className="relative z-10 flex-1 flex flex-col min-h-0">
+      <main className="relative z-10 flex-1 flex flex-col min-h-0 overflow-hidden">
         {pomodoro.phase === 'idle' && !showStats && (
           <SetupPanel
             settings={settings}
@@ -106,6 +108,7 @@ export const App: React.FC = () => {
             series30Days={series30Days}
             hasData={hasAnyData}
             onBack={() => setShowStats(false)}
+            onClearStats={clearStats}
           />
         )}
 
@@ -128,27 +131,21 @@ export const App: React.FC = () => {
             onSkipBreak={pomodoro.skipBreakToWork}
             onMinimize={pomodoro.minimizeToDock}
             onEndSession={pomodoro.endSession}
+            onCycleWorkQuote={pomodoro.cycleWorkQuote}
+            onCycleRestPrompt={pomodoro.cycleRestPrompt}
+            onCycleRestBenefit={pomodoro.cycleRestBenefit}
           />
         )}
 
         {pomodoro.phase === 'complete' && (
           <CompletionScreen
             completedRounds={pomodoro.completedRounds}
-            focusedMinutes={Math.round(pomodoro.accruedWorkSeconds / 60)}
+            focusedMinutes={focusedSecondsToMinutes(pomodoro.accruedWorkSeconds)}
             fxLevel={fxLevel}
             onPlanAnotherSession={pomodoro.resetToSetup}
           />
         )}
       </main>
-
-      {/* Desktop App Status Footer */}
-      <footer className="relative z-10 border-t border-border/60 py-2.5 px-4 text-center font-mono text-[11px] text-muted-foreground select-none flex items-center justify-between">
-        <span className="flex items-center space-x-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ff88] shadow-[0_0_5px_#00ff88]" />
-          <span>LOCAL_CONTAINER: NATIVE_DESKTOP</span>
-        </span>
-        <span className="text-muted-foreground/80">ZERO CLOUD // FULL PRIVACY // OFFLINE READY</span>
-      </footer>
     </div>
   );
 };
